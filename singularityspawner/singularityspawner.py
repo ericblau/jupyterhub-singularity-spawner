@@ -57,7 +57,8 @@ class SingularitySpawner(LocalProcessSpawner):
         """
     ).tag(config=True)
 
-    notebook_cmd = Command(['jupyterhub-singleuser'],
+    notebook_cmd = Command(['/opt/conda/bin/jupyterhub-singleuser'],
+    #notebook_cmd = Command(['/usr/local/bin/start-singleuser.sh'],
         help="""
         The command used for starting the single-user server.
         Provide either a string or a list containing the path to the startup script command. Extra arguments,
@@ -95,23 +96,25 @@ class SingularitySpawner(LocalProcessSpawner):
 
     form_template = Unicode(
         """
-        <div class="checkbox">
-          <label>
-            <input id="pull-checkbox" type="checkbox" value="pull" name="pull_from_url">Pull from URL
-          </label>
-        </div>
-        <div id="url-group" class="form-group" hidden>
-          <label for="user_image_url">
-            Specify the image URL to pull from:
-          </label>
-          <input class="form-control" name="user_image_url" value="{default_image_url}">
-        </div>
-        <div class="form-group">
-          <label id="path-label" for="user_image_path">
-            Specify the Singularity image to use (absolute filepath):
-          </label>
-          <input class="form-control" name="user_image_path" value="{default_image_path}" required autofocus>
-        </div>
+
+<!-- Multiple Radios -->
+<div class="form-group">
+  <label class="col-md-4 control-label" for="images">Select an Image</label>
+  <div class="col-md-4">
+  <div class="radio">
+    <label for="images-0">
+      <input type="radio" name="user_image_path" id="images-0" value="/mnt/images/ub-jup.img" checked="checked">
+      Ubuntu Jupyterlab
+    </label>
+	</div>
+  <div class="radio">
+    <label for="images-1">
+      <input type="radio" name="user_image_path" id="images-1" value="/mnt/images/ubuntu-scipy.img">
+	ubuntu-scipy
+    </label>
+	</div>
+  </div>
+</div>
         """
     )
 
