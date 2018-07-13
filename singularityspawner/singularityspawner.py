@@ -57,7 +57,7 @@ class SingularitySpawner(LocalProcessSpawner):
         """
     ).tag(config=True)
 
-    notebook_cmd = Command(['/opt/conda/bin/jupyterhub-singleuser'],
+    notebook_cmd = Command(['/opt/anaconda3/bin/jupyterhub-singleuser'],
         help="""
         The command used for starting the single-user server.
         Provide either a string or a list containing the path to the startup script command. Extra arguments,
