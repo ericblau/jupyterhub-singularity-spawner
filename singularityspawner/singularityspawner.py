@@ -48,7 +48,7 @@ class SingularitySpawner(LocalProcessSpawner):
     2) Spawning a Notebook server within a Singularity container
     """
 
-    singularity_cmd = Command(['/usr/local/bin/singularity','exec'],
+    singularity_cmd = Command(['/usr/bin/singularity','exec'],
         help="""
         This is the singularity command that will be executed when starting the
         single-user server. The image path and notebook server args will be concatenated to the end of this command. This is a good place to
@@ -58,7 +58,6 @@ class SingularitySpawner(LocalProcessSpawner):
     ).tag(config=True)
 
     notebook_cmd = Command(['/opt/conda/bin/jupyterhub-singleuser'],
-    #notebook_cmd = Command(['/usr/local/bin/start-singleuser.sh'],
         help="""
         The command used for starting the single-user server.
         Provide either a string or a list containing the path to the startup script command. Extra arguments,
