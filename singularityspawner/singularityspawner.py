@@ -129,7 +129,7 @@ class SingularitySpawner(LocalProcessSpawner):
     sudo_args = List(['-nH'], config=True,
         help="Extra args to pass to sudo"
     )
-    debug_mediator = Bool(True, config=True,
+    debug_mediator = Bool(False, config=True,
         help="Extra log output from the mediator process for debugging",
     )
 
@@ -211,7 +211,7 @@ class SingularitySpawner(LocalProcessSpawner):
         cmd = ['sudo', '-u', self.user.escaped_name]
         cmd.extend(self.sudo_args)
         cmd.append(self.singularitysudospawner_path)
-        cmd.append('--logging=debug')
+        #cmd.append('--logging=debug')
         if self.debug_mediator:
             cmd.append('--logging=debug')
 
@@ -233,9 +233,10 @@ class SingularitySpawner(LocalProcessSpawner):
 
         try:
             data_str = data_str[data_str.index('{'):data_str.rindex('}')+1]
-            response = json.loads(data_str)
             f = open("/tmp/mediatorresponse.txt", "a")
             f.write(data_str)
+            f.close()
+            response = json.loads(data_str)
         except ValueError:
             self.log.error("Failed to get JSON result from mediator: %r" % data_str)
             raise
