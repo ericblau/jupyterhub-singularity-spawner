@@ -12,6 +12,7 @@ import pipes
 import json
 import shutil
 import sys
+import glob
 
 
 from tornado import gen
@@ -119,10 +120,22 @@ class SingularitySpawner(LocalProcessSpawner):
 	ubuntu-scipy
     </label>
 	</div>
+   {sys_image_template}
   </div>
 </div>
         """
     )
+
+    sys_image_template = Unicode("""
+  <div class="radio">
+    <label for="images-1">
+      <input type="radio" name="user_image_path" id="sysimages-{imageindex}" value="{sys_image}">
+	{sys_image}
+    </label>
+	</div>
+        """
+    )
+
     singularitysudospawner_path = Unicode(shutil.which('singularitysudospawner') or 'singularitysudospawner', config=True,
         help="Path to singularitysudospawner script"
     )
@@ -131,6 +144,14 @@ class SingularitySpawner(LocalProcessSpawner):
     )
     debug_mediator = Bool(False, config=True,
         help="Extra log output from the mediator process for debugging",
+    )
+
+    system_singularity_images = List([], config=False,
+        help="system-wide singularity images",
+    )
+
+    user_singularity_images = List([], config=False,
+        help="user defined singularity images",
     )
 
     def format_default_image_path(self):
@@ -143,8 +164,11 @@ class SingularitySpawner(LocalProcessSpawner):
     def _options_form(self):
         """Render the options form."""
         default_image_path = self.format_default_image_path()
-        format_options = dict(default_image_path=default_image_path,default_image_url=self.default_image_url)
-        options_form = self.form_template.format(**format_options)
+        system_images = self.get_system_singularity_images()
+        format_options = dict(default_image_path=default_image_path,default_image_url=self.default_image_url,system_images=system_images)
+        #sys_image_frag = ''.join([ self.sys_image_template.format(sys_image=si, imageindex=i) for i, si in enumerate(system_images) ])
+        sys_image_frag = ''.join([ self.sys_image_template.format(sys_image=si, imageindex=si) for si in system_images ])
+        options_form = self.form_template.format(**format_options,sys_image_template=sys_image_frag)
         return JS_SCRIPT + options_form
 
     def options_from_form(self, form_data):
@@ -166,6 +190,10 @@ class SingularitySpawner(LocalProcessSpawner):
         default_image_path = self.format_default_image_path()
         image_path = self.user_options.get('user_image_path',[default_image_path])
         return image_path
+
+    def get_system_singularity_images(self):
+        """Get image names from the defined image path."""
+        return glob.glob('/mnt/images/*.img')
 
     @gen.coroutine
     def pull_image(self,image_url):
