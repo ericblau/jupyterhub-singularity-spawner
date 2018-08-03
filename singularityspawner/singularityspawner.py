@@ -1,7 +1,7 @@
 # Copyright (c) 2017, Zebula Sampedro, CU Boulder Research Computing
 
 """
-Singularity Spawner
+Singularity Sudo Spawner
 
 SingularitySpawner provides a mechanism for spawning Jupyter Notebooks inside of Singularity containers. The spawner options form is leveraged such that the user can specify which Singularity image the spawner should use.
 
@@ -9,11 +9,18 @@ A `singularity exec {notebook spawn cmd}` is used to start the notebook inside o
 """
 import os
 import pipes
+import json
+import shutil
+import sys
+
 
 from tornado import gen
+from tornado.ioloop import IOLoop
 from tornado.process import Subprocess
 from tornado.iostream import StreamClosedError
 from singularity.cli import Singularity
+
+from traitlets import List, Unicode, Bool
 
 from jupyterhub.spawner import (
     LocalProcessSpawner, set_user_setuid
@@ -116,6 +123,15 @@ class SingularitySpawner(LocalProcessSpawner):
 </div>
         """
     )
+    singularitysudospawner_path = Unicode(shutil.which('singularitysudospawner') or 'singularitysudospawner', config=True,
+        help="Path to singularitysudospawner script"
+    )
+    sudo_args = List(['-nH'], config=True,
+        help="Extra args to pass to sudo"
+    )
+    debug_mediator = Bool(False, config=True,
+        help="Extra log output from the mediator process for debugging",
+    )
 
     def format_default_image_path(self):
         """Format the image path template string."""
@@ -170,6 +186,85 @@ class SingularitySpawner(LocalProcessSpawner):
     @property
     def cmd(self):
         return self._build_cmd()
+
+    @gen.coroutine
+    def relog_stderr(self, stderr):
+        while not stderr.closed():
+            try:
+                line = yield stderr.read_until(b'\n')
+            except StreamClosedError:
+                return
+            else:
+                # TODO: log instead of write to stderr directly?
+                # If we do that, will get huge double-prefix messages:
+                # [I date JupyterHub] [W date SingleUser] msg...
+                sys.stderr.write(line.decode('utf8', 'replace'))
+
+    def make_preexec_fn(self):
+        return None
+
+    @gen.coroutine
+    def do(self, action, **kwargs):
+        """Instruct the mediator process to take a given action"""
+        kwargs['action'] = action
+        cmd = ['sudo', '-u', self.user.name]
+        cmd.extend(self.sudo_args)
+        cmd.append(self.sudospawner_path)
+        if self.debug_mediator:
+            cmd.append('--logging=debug')
+
+        self.log.debug("Spawning %s", cmd)
+        p = Subprocess(cmd, stdin=Subprocess.STREAM, stdout=Subprocess.STREAM, stderr=Subprocess.STREAM, preexec_fn=self.make_preexec_fn())
+        stderr_future = self.relog_stderr(p.stderr)
+        # hand the stderr future to the IOLoop so it isn't orphaned,
+        # even though we aren't going to wait for it unless there's an error
+        IOLoop.current().add_callback(lambda : stderr_future)
+
+        yield p.stdin.write(json.dumps(kwargs).encode('utf8'))
+        p.stdin.close()
+        data = yield p.stdout.read_until_close()
+        if p.returncode:
+            yield stderr_future
+            raise RuntimeError("sudospawner subprocess failed with exit code: %r" % p.returncode)
+
+        data_str = data.decode('utf8', 'replace')
+
+        try:
+            data_str = data_str[data_str.index('{'):data_str.rindex('}')+1]
+            response = json.loads(data_str)
+        except ValueError:
+            self.log.error("Failed to get JSON result from mediator: %r" % data_str)
+            raise
+        return response
+
+    @gen.coroutine
+    def _signal(self, sig):
+        if sig == 0:
+            # short-circuit existence check without invoking sudo
+            try:
+                os.kill(self.pid, sig)
+            except ProcessLookupError:
+                # No such process
+                return False
+            except PermissionError:
+                # When running hub with reduced permissions,
+                # we won't have permission to send signals, even 0.
+                # PermissionError means process exists.
+                pass
+            return True
+        reply = yield self.do('kill', pid=self.pid, signal=sig)
+        return reply['alive']
+
+    @gen.coroutine
+    def start(self):
+        self.port = random_port()
+
+        # only args, not the base command
+        reply = yield self.do(action='spawn', args=self.get_args(), env=self.get_env())
+        self.pid = reply['pid']
+        print(self.ip)
+        # 0.7 expects ip, port to be returned
+        return (self.ip or '127.0.0.1', self.port)
 
     @gen.coroutine
     def start(self):
