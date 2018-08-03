@@ -26,11 +26,13 @@ import json
 import pipes
 import os
 import sys
+import shlex
 
 from subprocess import Popen, TimeoutExpired
 
 from tornado import log
 from tornado.options import parse_command_line
+from jupyterhub.traitlets import Command
 app_log = log.app_log
 
 
@@ -71,22 +73,31 @@ def kill(pid, signal):
         e, signal, pid)
         alive = False
     else:
-        alive = True
+        alive = False
     finish({
         'ok': True,
-        'alive': alive,
+        'alive': alive
     })
 
-def spawn(singleuser, args, env):
+def spawn(singleuser, singularitycmd, args, env):
     """spawn a single-user server
     
     Takes args *not including executable* for security reasons.
     Start the single-user server via `python -m jupyterhub.singleuser`,
     and prohibit PYTHONPATH from env for basic protections.
     """
-    cmd = [singleuser] + args
+    origcmd = [singleuser] + args
+    #cmd = [singularitycmd] + args
+    cmd = []
+    cmd.extend(singularitycmd)
+    cmd.extend(args)
+    app_log.error("command is %s", cmd)
+    app_log.info("origcommand is %s", cmd)
     cmd_s = ' '.join(pipes.quote(s) for s in cmd)
+    app_log.warn("command_s is %s", cmd_s)
     app_log.info("Spawning %s", cmd_s)
+    f = open("/tmp/spawningcmd.txt", "a")
+    f.write(cmd_s)
     if 'PYTHONPATH' in env:
         app_log.warn("PYTHONPATH env not allowed for security reasons")
         env.pop('PYTHONPATH')
@@ -115,10 +126,15 @@ def spawn(singleuser, args, env):
             # launch the single-user server from the subprocess
             # TODO: If we want to see single-user log output,
             # we should send stderr to a file
-            p = Popen(cmd, env=env,
+            p = Popen(shlex.split(cmd_s), env=env,
                 cwd=os.path.expanduser('~'),
                 stdout=sys.stderr.fileno(),
             )
+            #p = Popen(cmd_s, env=env,
+            #    cwd=os.path.expanduser('~'),
+            #    stdout=sys.stderr.fileno(),
+            #    shell=True,
+            #)
         except Exception as e:
             result = {
                 'ok': False,
@@ -151,12 +167,17 @@ def main():
     """parse JSON from stdin, and take the appropriate action"""
     parse_command_line()
     app_log.debug("Starting mediator for %s", getpass.getuser())
+
     try:
         kwargs = json.load(sys.stdin)
     except ValueError as e:
         app_log.error("Expected JSON on stdin, got %s" % e)
         sys.exit(1)
     
+    f = open("/tmp/demofile.txt", "a")
+    f.write(str(kwargs))
+    singularitycmd = kwargs.pop('singularitycmd')
+
     action = kwargs.pop('action')
     if action == 'kill':
         kill(**kwargs)
@@ -171,7 +192,7 @@ def main():
         if not os.path.exists(singleuser):
             # default: call jupyterhub-singleuser directly
             singleuser = os.path.join(script_dir, 'jupyterhub-singleuser')
-        spawn(singleuser, **kwargs)
+        spawn(singleuser, singularitycmd, **kwargs)
     else:
         raise TypeError("action must be 'spawn' or 'kill'")
 

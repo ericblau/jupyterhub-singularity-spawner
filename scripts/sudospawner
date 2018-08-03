@@ -1,0 +1,4 @@
+#!/opt/conda/bin/python3
+
+from singularityspawner import mediator
+mediator.main()

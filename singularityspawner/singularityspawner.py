@@ -129,7 +129,7 @@ class SingularitySpawner(LocalProcessSpawner):
     sudo_args = List(['-nH'], config=True,
         help="Extra args to pass to sudo"
     )
-    debug_mediator = Bool(False, config=True,
+    debug_mediator = Bool(True, config=True,
         help="Extra log output from the mediator process for debugging",
     )
 
@@ -207,13 +207,15 @@ class SingularitySpawner(LocalProcessSpawner):
     def do(self, action, **kwargs):
         """Instruct the mediator process to take a given action"""
         kwargs['action'] = action
-        cmd = ['sudo', '-u', self.user.name]
+        kwargs['singularitycmd'] = self.cmd
+        cmd = ['sudo', '-u', self.user.escaped_name]
         cmd.extend(self.sudo_args)
-        cmd.append(self.sudospawner_path)
+        cmd.append(self.singularitysudospawner_path)
+        cmd.append('--logging=debug')
         if self.debug_mediator:
             cmd.append('--logging=debug')
 
-        self.log.debug("Spawning %s", cmd)
+        self.log.debug("Spawning %s %s", cmd, kwargs['singularitycmd'])
         p = Subprocess(cmd, stdin=Subprocess.STREAM, stdout=Subprocess.STREAM, stderr=Subprocess.STREAM, preexec_fn=self.make_preexec_fn())
         stderr_future = self.relog_stderr(p.stderr)
         # hand the stderr future to the IOLoop so it isn't orphaned,
@@ -232,6 +234,8 @@ class SingularitySpawner(LocalProcessSpawner):
         try:
             data_str = data_str[data_str.index('{'):data_str.rindex('}')+1]
             response = json.loads(data_str)
+            f = open("/tmp/mediatorresponse.txt", "a")
+            f.write(data_str)
         except ValueError:
             self.log.error("Failed to get JSON result from mediator: %r" % data_str)
             raise
@@ -267,7 +271,7 @@ class SingularitySpawner(LocalProcessSpawner):
         return (self.ip or '127.0.0.1', self.port)
 
     @gen.coroutine
-    def start(self):
+    def foostart(self):
         """
         Start the single-user server in the Singularity container specified
         by image path, pulling from docker or shub first if the pull option
