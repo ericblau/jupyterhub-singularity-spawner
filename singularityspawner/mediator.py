@@ -96,8 +96,6 @@ def spawn(singleuser, singularitycmd, args, env):
     cmd_s = ' '.join(pipes.quote(s) for s in cmd)
     app_log.warn("command_s is %s", cmd_s)
     app_log.info("Spawning %s", cmd_s)
-    f = open("/tmp/spawningcmd.txt", "a")
-    f.write(cmd_s)
     if 'PYTHONPATH' in env:
         app_log.warn("PYTHONPATH env not allowed for security reasons")
         env.pop('PYTHONPATH')
@@ -130,11 +128,6 @@ def spawn(singleuser, singularitycmd, args, env):
                 cwd=os.path.expanduser('~'),
                 stdout=sys.stderr.fileno(),
             )
-            #p = Popen(cmd_s, env=env,
-            #    cwd=os.path.expanduser('~'),
-            #    stdout=sys.stderr.fileno(),
-            #    shell=True,
-            #)
         except Exception as e:
             result = {
                 'ok': False,
@@ -174,8 +167,6 @@ def main():
         app_log.error("Expected JSON on stdin, got %s" % e)
         sys.exit(1)
     
-    f = open("/tmp/demofile.txt", "a")
-    f.write(str(kwargs))
     singularitycmd = kwargs.pop('singularitycmd')
 
     action = kwargs.pop('action')

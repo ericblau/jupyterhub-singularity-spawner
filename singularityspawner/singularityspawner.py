@@ -271,9 +271,6 @@ class SingularitySpawner(LocalProcessSpawner):
 
         try:
             data_str = data_str[data_str.index('{'):data_str.rindex('}')+1]
-            f = open("/tmp/mediatorresponse.txt", "a")
-            f.write(data_str)
-            f.close()
             response = json.loads(data_str)
         except ValueError:
             self.log.error("Failed to get JSON result from mediator: %r" % data_str)
