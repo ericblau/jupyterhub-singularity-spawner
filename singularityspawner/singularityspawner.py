@@ -106,21 +106,16 @@ class SingularitySpawner(LocalProcessSpawner):
 
 <!-- Multiple Radios -->
 <div class="form-group">
-  <label class="col-md-4 control-label" for="images">Select an Image</label>
-  <div class="col-md-4">
-  <div class="radio">
-    <label for="images-0">
-      <input type="radio" name="user_image_path" id="images-0" value="/mnt/images/ub-jup.img" checked="checked">
-      Ubuntu Jupyterlab
-    </label>
-	</div>
-  <div class="radio">
-    <label for="images-1">
-      <input type="radio" name="user_image_path" id="images-1" value="/mnt/images/ubuntu-scipy.img">
-	ubuntu-scipy
-    </label>
-	</div>
+  <label class="col-md-12 control-label" for="images">Select an Image</label>
+  <div class="col-md-12">
+  </div>
+  <label class="col-md-12 control-label" for="images">System Images</label>
+  <div class="col-md-12">
    {sys_image_template}
+  </div>
+  <label class="col-md-12 control-label" for="images">User Images</label>
+  <div class="col-md-12">
+   {user_image_template}
   </div>
 </div>
         """
@@ -130,7 +125,17 @@ class SingularitySpawner(LocalProcessSpawner):
   <div class="radio">
     <label for="images-1">
       <input type="radio" name="user_image_path" id="sysimages-{imageindex}" value="{sys_image}">
-	{sys_image}
+	{sys_image_name}
+    </label>
+	</div>
+        """
+    )
+
+    user_image_template = Unicode("""
+  <div class="radio">
+    <label for="images-1">
+      <input type="radio" name="user_image_path" id="userimages-{imageindex}" value="{user_image}">
+	{user_image_name}
     </label>
 	</div>
         """
@@ -165,10 +170,11 @@ class SingularitySpawner(LocalProcessSpawner):
         """Render the options form."""
         default_image_path = self.format_default_image_path()
         system_images = self.get_system_singularity_images()
+        user_images = self.get_user_singularity_images()
         format_options = dict(default_image_path=default_image_path,default_image_url=self.default_image_url,system_images=system_images)
-        #sys_image_frag = ''.join([ self.sys_image_template.format(sys_image=si, imageindex=i) for i, si in enumerate(system_images) ])
-        sys_image_frag = ''.join([ self.sys_image_template.format(sys_image=si, imageindex=si) for si in system_images ])
-        options_form = self.form_template.format(**format_options,sys_image_template=sys_image_frag)
+        sys_image_frag = ''.join([ self.sys_image_template.format(sys_image=si, imageindex=i,sys_image_name=si[si.rindex('/')+1:si.rindex('.img')]) for i, si in enumerate(system_images) ])
+        user_image_frag = ''.join([ self.user_image_template.format(user_image=ui, imageindex=i,user_image_name=ui[ui.rindex('/')+1:ui.rindex('.img')]) for i, ui in enumerate(user_images) ])
+        options_form = self.form_template.format(**format_options,sys_image_template=sys_image_frag,user_image_template=user_image_frag)
         return JS_SCRIPT + options_form
 
     def options_from_form(self, form_data):
@@ -194,6 +200,10 @@ class SingularitySpawner(LocalProcessSpawner):
     def get_system_singularity_images(self):
         """Get image names from the defined image path."""
         return glob.glob('/mnt/images/*.img')
+
+    def get_user_singularity_images(self):
+        """Get image names from the defined image path."""
+        return glob.glob('/home/'+self.user.escaped_name+'/simages/*.img')
 
     @gen.coroutine
     def pull_image(self,image_url):
