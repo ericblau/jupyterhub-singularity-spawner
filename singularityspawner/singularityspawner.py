@@ -253,13 +253,24 @@ class SingularitySpawner(LocalProcessSpawner):
         if self.debug_mediator:
             cmd.append('--logging=debug')
 
-        self.log.debug("Spawning %s %s", cmd, kwargs['singularitycmd'])
+        self.log.debug("Spawning %s %s %s", cmd, kwargs['singularitycmd'], kwargs)
         p = Subprocess(cmd, stdin=Subprocess.STREAM, stdout=Subprocess.STREAM, stderr=Subprocess.STREAM, preexec_fn=self.make_preexec_fn())
         stderr_future = self.relog_stderr(p.stderr)
         # hand the stderr future to the IOLoop so it isn't orphaned,
         # even though we aren't going to wait for it unless there's an error
         IOLoop.current().add_callback(lambda : stderr_future)
 
+        globus_data = ''
+        try:
+            globus_data = kwargs['env'].pop('GLOBUS_DATA')
+        except KeyError:
+            pass
+        self.log.debug("After kwargs.pop %s", kwargs)
+
+        if globus_data:
+            kwargs['env']['GLOBUS_DATA']=globus_data.decode('utf8')
+        self.log.debug("After globus_data.decode  %s", kwargs)
+	
         yield p.stdin.write(json.dumps(kwargs).encode('utf8'))
         p.stdin.close()
         data = yield p.stdout.read_until_close()
